@@ -6,7 +6,6 @@ local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
--- ====================== VARIÁVEIS ======================
 local espEnabled, espNicksEnabled, espDistanceEnabled, espLifeEnabled, espGlowEnabled = false, false, false, false, false
 local teamCheck, wallCheck, aimbotEnabled, showFov, aimColorEnabled = false, false, false, false, false
 local showAimColorFov, targetPart, fovRadius, aimColorFovRadius = true, "Head", 150, 100
@@ -73,7 +72,6 @@ elseif game:GetService("VirtualInputManager") then
     end
 end
 
--- ====================== FUNÇÕES AUXILIARES ======================
 local function createFPSDisplay()
     if fpsLabel then pcall(function() fpsLabel:Remove() end); fpsLabel = nil end
     if not showFps then return end
@@ -167,7 +165,6 @@ local function isMouseOverPanel()
            mousePos.Y >= absPos.Y and mousePos.Y <= absPos.Y + absSize.Y
 end
 
--- ====================== CORES ======================
 local DEFAULT_ACCENT = Color3.fromRGB(255, 140, 0)
 local COLORS = {
     PRIMARY = Color3.fromRGB(0, 0, 0),
@@ -195,7 +192,6 @@ local TITLE_COLORS = {
     {Nome = "RGB", Cor = Color3.fromRGB(255, 0, 0)}
 }
 
--- ====================== CRIAÇÃO DA GUI ======================
 ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "ESP_UI"
 ScreenGui.ResetOnSpawn = false
@@ -308,7 +304,6 @@ AnonimatoButton.MouseButton1Click:Connect(function()
     updateAnonimatoVisual()
 end)
 
--- Drag do painel
 local draggingPanel = false
 local dragStartPos
 local panelStartPos
@@ -410,7 +405,6 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ====================== CONTEÚDO DAS ABAS ======================
 local TabContent = Instance.new("Frame", MainFrame)
 TabContent.Size = UDim2.new(1, -20, 0, 250)
 TabContent.Position = UDim2.new(0, 10, 0, 80)
@@ -497,7 +491,6 @@ AimColorRightLayout.FillDirection = Enum.FillDirection.Vertical
 AimColorRightLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 AimColorRightLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 
--- ====================== PAINÉIS INFERIORES ======================
 local KeyPanel = Instance.new("Frame", MainFrame)
 KeyPanel.Size = UDim2.new(1, -20, 0, 45)
 KeyPanel.Position = UDim2.new(0, 10, 1, -50)
@@ -696,7 +689,6 @@ AimbotTabButton = createTabButton(TabBar, "Aimbot", UDim2.new(0, 340, 0, 0), fun
 
 showTab("ESP")
 
--- ====================== MENUS DE TECLA E COR ======================
 KeyMenu = Instance.new("Frame", ScreenGui)
 KeyMenu.Size = UDim2.new(0, 250, 0, 120)
 KeyMenu.BackgroundColor3 = COLORS.PRIMARY
@@ -863,7 +855,6 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
     end
 end)
 
--- ====================== SEÇÕES E ELEMENTOS ======================
 local colorMenuTitle = nil
 local fovCircle = nil
 local aimColorFovCircle = nil
@@ -1081,7 +1072,6 @@ local function createSlider(parent, name, min, max, default, onChanged)
     return sliderContainer
 end
 
--- ====================== ESP / GLOW / LIFE ======================
 local function cleanupLifeESP(player)
     local data = lifeObjects[player]
     if data then
@@ -1311,7 +1301,6 @@ aimbotTargetLabel.TextXAlignment = Enum.TextXAlignment.Center
 aimbotTargetLabel.TextYAlignment = Enum.TextYAlignment.Center
 aimbotTargetLabel.Text = ""
 
--- ====================== NOVO ESP COM BILLBOARDGUI ======================
 local function createESP(player)
     if player == LocalPlayer or espBillboardObjects[player] then return end
     local head = player.Character and player.Character:FindFirstChild("Head")
@@ -1391,7 +1380,9 @@ local function updateESPTexts()
             end
         end
     end
-endlocal function updateAllESP()
+end
+
+local function updateAllESP()
     if not espEnabled then return end
     for _, player in ipairs(Players:GetPlayers()) do
         if player == LocalPlayer then continue end
@@ -1436,7 +1427,6 @@ local function recreateAllESP()
     end
 end
 
--- ====================== FUNÇÕES DE VISIBILIDADE E ALVO ======================
 local function isVisible(part)
     if not wallCheck then return true end
     local now = tick()
@@ -1534,7 +1524,6 @@ local function moveMouseTowardsPart(part, strength, prediction)
     mouseMoveFunc(deltaX * strength, deltaY * strength)
 end
 
--- ====================== FUNÇÕES DE ITENS ======================
 local function localPlayerHasItem()
     local char = LocalPlayer.Character
     if not char then return false end
@@ -1554,7 +1543,6 @@ local function getEquippedTool()
     return nil
 end
 
--- ====================== CRIAÇÃO DOS TOGGLES E SLIDERS ======================
 createToggleButton(ESPTabFrame, "ESP", function() return espEnabled end, function()
     espEnabled = not espEnabled
     if espEnabled then recreateAllESP() else clearAllESP(); clearAllGlow(); clearAllLifeESP() end
@@ -1605,7 +1593,6 @@ createSlider(AimColorRightFrame, "Predição AimColor", 0, 500, aimColorPredicti
     aimColorPrediction = value / 1000
 end)
 
--- ====================== CONEXÕES DE JOGADORES ======================
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then
         createESP(player)
@@ -1655,10 +1642,8 @@ Players.PlayerRemoving:Connect(function(player)
     cleanupLifeESP(player)
 end)
 
--- ====================== LOOP PRINCIPAL ======================
 local lastAimColorTargetUpdate = 0
 local cachedAimColorPart = nil
-local noRecoilNextFire = 0
 
 RunService.RenderStepped:Connect(function()
     if not panelLoaded then return end
