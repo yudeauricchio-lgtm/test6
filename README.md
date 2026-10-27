@@ -17,7 +17,7 @@ local savedPosition, panelLoaded, anonimatoEnabled = nil, false, false
 local clickCount, lastClickTime, nextFireTime = 0, 0, 0
 local mouse1Down, ignoreMouse1Release = false, false
 local DISFARCE_PARTS = {"Head", "Torso", "HumanoidRootPart", "Left Arm", "Right Arm", "Left Leg", "Right Leg"}
-local frameCount, lastTime, currentFps, fpsLabel, espUpdateTimer = 0, tick(), 0, nil, 0
+local frameCount, lastTime, currentFps, espUpdateTimer = 0, tick(), 0, 0
 
 local visibilityCache = {}
 local VISIBILITY_CACHE_TIME = 0.2
@@ -33,22 +33,28 @@ local CurrentKeyButton, CurrentAimbotKeyButton, CurrentColorButton = nil, nil, n
 local AnonimatoButton, AnonimatoIndicator = nil, nil
 local targetPartsList = {"Head", "HumanoidRootPart"}
 local currentTargetIndex = 1
-
 local aimbotTargetFrame = nil
 local aimbotTargetLabel = nil
+local fovFrame = nil
+local aimColorFovFrame = nil
+local usingRgb = false
+local rgbHue = 0
+local rgbConnection = nil
 
 local mouseMoveFunc = nil
 if mousemoverel then
-    mouseMoveFunc = function(dx, dy) mousemoverel(dx, dy) end
+    mouseMoveFunc = function(dx, dy) pcall(function() mousemoverel(dx, dy) end) end
 elseif setmousepos then
     mouseMoveFunc = function(dx, dy)
-        local cur = UserInputService:GetMouseLocation()
-        setmousepos(cur.X + dx, cur.Y + dy)
+        pcall(function()
+            local cur = UserInputService:GetMouseLocation()
+            setmousepos(cur.X + dx, cur.Y + dy)
+        end)
     end
 elseif mouse_move then
-    mouseMoveFunc = function(dx, dy) mouse_move(dx, dy) end
+    mouseMoveFunc = function(dx, dy) pcall(function() mouse_move(dx, dy) end) end
 elseif move_mouse then
-    mouseMoveFunc = function(dx, dy) move_mouse(dx, dy) end
+    mouseMoveFunc = function(dx, dy) pcall(function() move_mouse(dx, dy) end) end
 end
 
 local mouseClickFunc = nil
@@ -72,19 +78,6 @@ elseif game:GetService("VirtualInputManager") then
     end
 end
 
-local function createFPSDisplay()
-    if fpsLabel then pcall(function() fpsLabel:Remove() end); fpsLabel = nil end
-    if not showFps then return end
-    fpsLabel = Drawing.new("Text")
-    fpsLabel.Visible = true
-    fpsLabel.Center = false
-    fpsLabel.Outline = false
-    fpsLabel.Font = 2
-    fpsLabel.Size = 16
-    fpsLabel.Color = Color3.fromRGB(255, 140, 0)
-    fpsLabel.Position = Vector2.new(Camera.ViewportSize.X - 60, 15)
-end
-
 local function updateFPS()
     frameCount = frameCount + 1
     local currentTime = tick()
@@ -92,11 +85,6 @@ local function updateFPS()
         currentFps = frameCount
         frameCount = 0
         lastTime = currentTime
-        if fpsLabel and showFps then
-            fpsLabel.Color = Color3.fromRGB(255, 140, 0)
-            fpsLabel.Text = ("FPS: %d"):format(currentFps)
-            fpsLabel.Position = Vector2.new(Camera.ViewportSize.X - 60, 15)
-        end
     end
 end
 
@@ -210,8 +198,8 @@ if not ScreenGui.Parent then
 end
 
 MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 480, 0, 450)
-MainFrame.Position = UDim2.new(0.5, -240, 0.5, -225)
+MainFrame.Size = UDim2.new(0, 480, 0, 500)
+MainFrame.Position = UDim2.new(0.5, -240, 0.5, -250)
 MainFrame.BackgroundColor3 = COLORS.PRIMARY
 MainFrame.BackgroundTransparency = 0.6
 MainFrame.BorderSizePixel = 0
@@ -406,7 +394,7 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 local TabContent = Instance.new("Frame", MainFrame)
-TabContent.Size = UDim2.new(1, -20, 0, 250)
+TabContent.Size = UDim2.new(1, -20, 0, 300)
 TabContent.Position = UDim2.new(0, 10, 0, 80)
 TabContent.BackgroundTransparency = 1
 TabContent.BorderSizePixel = 0
@@ -856,13 +844,9 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
 end)
 
 local colorMenuTitle = nil
-local fovCircle = nil
-local aimColorFovCircle = nil
-local usingRgb = false
-local rgbHue = 0
-local rgbConnection = nil
 
 local function updateAllDynamicColors(color)
+    currentTitleColor = color
     TitleBar.BackgroundColor3 = color
     MinimizedFrame.BackgroundColor3 = color
     CurrentColorButton.BackgroundColor3 = color
@@ -881,8 +865,14 @@ local function updateAllDynamicColors(color)
     for _, sliderFill in pairs(sliderFills) do
         pcall(function() sliderFill.BackgroundColor3 = color end)
     end
-    if fovCircle then pcall(function() fovCircle.Color = color end) end
-    if aimColorFovCircle then pcall(function() aimColorFovCircle.Color = color end) end
+    if fovFrame then 
+        local stroke = fovFrame:FindFirstChildOfClass("UIStroke")
+        if stroke then stroke.Color = color end
+    end
+    if aimColorFovFrame then 
+        local stroke = aimColorFovFrame:FindFirstChildOfClass("UIStroke")
+        if stroke then stroke.Color = color end
+    end
 end
 
 local function startRgbMode()
@@ -892,8 +882,6 @@ local function startRgbMode()
         rgbHue = (rgbHue + 0.002) % 1
         local rgbColor = Color3.fromHSV(rgbHue, 1, 1)
         updateAllDynamicColors(rgbColor)
-        if fovCircle then fovCircle.Color = rgbColor end
-        if aimColorFovCircle then aimColorFovCircle.Color = rgbColor end
     end)
 end
 
@@ -1261,21 +1249,28 @@ local function clearAllGlow()
     glowObjects = {}
 end
 
-fovCircle = Drawing.new("Circle")
-fovCircle.Visible = showFov
-fovCircle.Thickness = 2
-fovCircle.Radius = fovRadius
-fovCircle.Transparency = 1
-fovCircle.Color = currentTitleColor
-fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+local function createCircleFrame(name, radius, initialPos)
+    local holder = Instance.new("Frame")
+    holder.Name = name
+    holder.BackgroundColor3 = Color3.new(1, 1, 1)
+    holder.BackgroundTransparency = 1
+    holder.Size = UDim2.new(0, radius * 2, 0, radius * 2)
+    holder.AnchorPoint = Vector2.new(0.5, 0.5)
+    holder.Position = initialPos
+    holder.ZIndex = 5
+    holder.Visible = false
+    holder.Parent = ScreenGui
+    local corner = Instance.new("UICorner", holder)
+    corner.CornerRadius = UDim.new(1, 0)
+    local stroke = Instance.new("UIStroke", holder)
+    stroke.Thickness = 2
+    stroke.Color = currentTitleColor
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    return holder
+end
 
-aimColorFovCircle = Drawing.new("Circle")
-aimColorFovCircle.Visible = false
-aimColorFovCircle.Thickness = 2
-aimColorFovCircle.Radius = aimColorFovRadius
-aimColorFovCircle.Transparency = 1
-aimColorFovCircle.Color = currentTitleColor
-aimColorFovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+fovFrame = createCircleFrame("FOV_Aimbot", fovRadius, UDim2.new(0.5, 0, 0.5, 0))
+aimColorFovFrame = createCircleFrame("FOV_AimColor", aimColorFovRadius, UDim2.new(0, 0, 0, 0))
 
 aimbotTargetFrame = Instance.new("Frame", ScreenGui)
 aimbotTargetFrame.Size = UDim2.new(0, 200, 0, 40)
@@ -1408,8 +1403,7 @@ local function updateAllESP()
 end
 
 local function updateAllGlows()
-    if not espGlowEnabled then return end
-    for _, player in ipairs(Players:GetPlayers()) do
+    if not espGlowEnabled then return end    for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then updateGlowForPlayer(player) end
     end
 end
@@ -1563,17 +1557,12 @@ createToggleButton(ESPTabFrame, "Verificar Time", function() return teamCheck en
 end)
 createToggleButton(ESPTabFrame, "Verificar Parede", function() return wallCheck end, function() wallCheck = not wallCheck end)
 
-createToggleButton(ExtraTabFrame, "Mostrar FPS", function() return showFps end, function()
-    showFps = not showFps
-    if showFps then createFPSDisplay() else if fpsLabel then pcall(function() fpsLabel:Remove() end) end end
-end)
 createToggleButton(ExtraTabFrame, "TP (Ctrl + Click)", function() return tpEnabled end, function() tpEnabled = not tpEnabled end)
 
 createToggleButton(AimbotLeftFrame, "Aimbot", function() return aimbotEnabled end, function() aimbotEnabled = not aimbotEnabled end)
 createToggleButton(AimbotLeftFrame, "Exibir FOV", function() return showFov end, function() showFov = not showFov end)
 createSlider(AimbotRightFrame, "FOV Aimbot", 50, 500, fovRadius, function(value)
     fovRadius = value
-    if fovCircle then fovCircle.Radius = value end
 end)
 createSlider(AimbotRightFrame, "Suavização Aimbot", 0, 10, smoothingFactor * 10, function(value)
     smoothingFactor = value / 10
@@ -1584,7 +1573,6 @@ createToggleButton(AimColorLeftFrame, "Exibir FOV AimColor", function() return s
 createToggleButton(AimColorLeftFrame, "AimColor Disfarce", function() return aimColorDisfarceEnabled end, function() aimColorDisfarceEnabled = not aimColorDisfarceEnabled end)
 createSlider(AimColorRightFrame, "FOV AimColor", 20, 500, aimColorFovRadius, function(value)
     aimColorFovRadius = value
-    if aimColorFovCircle then aimColorFovCircle.Radius = value end
 end)
 createSlider(AimColorRightFrame, "Força AimColor", 5, 100, aimColorStrength * 100, function(value)
     aimColorStrength = value / 100
@@ -1642,29 +1630,18 @@ Players.PlayerRemoving:Connect(function(player)
     cleanupLifeESP(player)
 end)
 
-local lastAimColorTargetUpdate = 0
-local cachedAimColorPart = nil
-
 RunService.RenderStepped:Connect(function()
     if not panelLoaded then return end
     local mousePos = UserInputService:GetMouseLocation()
     local mouseOverPanel = isMouseOverPanel()
 
-    fovCircle.Visible = showFov and aimbotEnabled
-    fovCircle.Radius = fovRadius
-    fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    fovFrame.Visible = showFov and aimbotEnabled
+    fovFrame.Size = UDim2.new(0, fovRadius * 2, 0, fovRadius * 2)
+    fovFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 
-    aimColorFovCircle.Visible = aimColorEnabled and showAimColorFov
-    aimColorFovCircle.Radius = aimColorFovRadius
-    aimColorFovCircle.Position = Vector2.new(mousePos.X, mousePos.Y)
-
-    if usingRgb then
-        fovCircle.Color = Color3.fromHSV(rgbHue, 1, 1)
-        aimColorFovCircle.Color = Color3.fromHSV(rgbHue, 1, 1)
-    else
-        fovCircle.Color = currentTitleColor
-        aimColorFovCircle.Color = currentTitleColor
-    end
+    aimColorFovFrame.Visible = aimColorEnabled and showAimColorFov
+    aimColorFovFrame.Size = UDim2.new(0, aimColorFovRadius * 2, 0, aimColorFovRadius * 2)
+    aimColorFovFrame.Position = UDim2.new(0, mousePos.X, 0, mousePos.Y)
 
     updateFPS()
 
@@ -1694,16 +1671,11 @@ RunService.RenderStepped:Connect(function()
         local partsList = aimColorDisfarceEnabled and DISFARCE_PARTS or {targetPart}
         local searchRadius = aimColorFovRadius
 
-        if tick() - lastAimColorTargetUpdate >= 0.1 or cachedAimColorPart == nil then
-            cachedAimColorPart = getAimColorTargetPart(searchRadius, partsList)
-            lastAimColorTargetUpdate = tick()
-        end
-
-        local part = cachedAimColorPart
-        if part then
+        local cachedAimColorPart = getAimColorTargetPart(searchRadius, partsList)
+        if cachedAimColorPart then
             local effStrength = aimColorDisfarceEnabled and 0.2 or aimColorStrength
             local effPrediction = aimColorDisfarceEnabled and 0.008 or aimColorPrediction
-            moveMouseTowardsPart(part, effStrength, effPrediction)
+            moveMouseTowardsPart(cachedAimColorPart, effStrength, effPrediction)
             
             if not aimColorDisfarceEnabled and localPlayerHasItem() and tick() >= nextFireTime then
                 task.spawn(function()
@@ -1718,12 +1690,7 @@ RunService.RenderStepped:Connect(function()
                 end)
                 nextFireTime = tick() + 0.1
             end
-        else
-            cachedAimColorPart = nil
         end
-    else
-        cachedAimColorPart = nil
-        lastAimColorTargetUpdate = 0
     end
 end)
 
