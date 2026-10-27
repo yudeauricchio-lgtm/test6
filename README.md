@@ -118,12 +118,22 @@ end
 local mouseMoveFunc = nil
 if mousemoverel then
     mouseMoveFunc = function(dx, dy) pcall(function() mousemoverel(dx, dy) end) end
+elseif setmousepos then
+    mouseMoveFunc = function(dx, dy) 
+        pcall(function() 
+            local cur = UserInputService:GetMouseLocation()
+            setmousepos(cur.X + dx, cur.Y + dy) 
+        end) 
+    end
 elseif mouse_move then
     mouseMoveFunc = function(dx, dy) pcall(function() mouse_move(dx, dy) end) end
-elseif setmousepos then
-    mouseMoveFunc = function(dx, dy) pcall(function() local cur = UserInputService:GetMouseLocation(); setmousepos(cur.X + dx, cur.Y + dy) end) end
 elseif VirtualInputManager then
-    mouseMoveFunc = function(dx, dy) pcall(function() local cur = UserInputService:GetMouseLocation(); VirtualInputManager:SendMouseMoveEvent(cur.X + dx, cur.Y + dy) end) end
+    mouseMoveFunc = function(dx, dy) 
+        pcall(function() 
+            local cur = UserInputService:GetMouseLocation()
+            VirtualInputManager:SendMouseMoveEvent(cur.X + dx, cur.Y + dy) 
+        end) 
+    end
 end
 
 local mouseClickFunc = nil
@@ -1168,8 +1178,7 @@ local function updateLifeESP(player)
         humanoid = hum, rootPart = root,
         healthConnection = hconn, deathConnection = dconn, characterConn = cconn
     }
-    local show = passesFilters(player) and (not teamCheck or player.Team ~= LocalPlayer.Team)
-    bb.Enabled = show
+    bb.Enabled = true
     updateLifeVisual(player)
 end
 
@@ -1475,7 +1484,7 @@ local function updateAllESP()
             if espLifeEnabled then
                 if not lifeObjects[p] and p.Character then updateLifeESP(p) end
                 if lifeObjects[p] and lifeObjects[p].billboard then
-                    lifeObjects[p].billboard.Enabled = passesFilters(p) and (not teamCheck or p.Team ~= LocalPlayer.Team) and isPlayerAlive(p)
+                    lifeObjects[p].billboard.Enabled = true
                     updateLifeVisual(p)
                 end
             end
@@ -1761,11 +1770,9 @@ RunService.RenderStepped:Connect(function()
                 local dy = sp.Y - mp.Y
                 if aimColorDisfarceEnabled then
                     local strength = aimColorStrength * 0.5
-                    if mousemoverel then mousemoverel(dx * strength, dy * strength)
-                    elseif mouseMoveFunc then mouseMoveFunc(dx * strength, dy * strength) end
+                    if mouseMoveFunc then mouseMoveFunc(dx * strength, dy * strength) end
                 else
-                    if mousemoverel then mousemoverel(dx, dy)
-                    elseif mouseMoveFunc then mouseMoveFunc(dx, dy) end
+                    if mouseMoveFunc then mouseMoveFunc(dx, dy) end
                     
                     if tick() >= nextFireTime then
                         safeSpawn(function()
@@ -1777,6 +1784,10 @@ RunService.RenderStepped:Connect(function()
                     end
                 end
             end
+        end
+    else
+        if not (aimbotEnabled and rmbDown and showAimbotTarget) then
+            aimbotTargetFrame.Visible = false
         end
     end
 end)
